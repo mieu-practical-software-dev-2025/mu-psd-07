@@ -9,10 +9,19 @@
     <style>
         body { font-family: sans-serif; display: flex; justify-content: center; background-color: #f4f4f9; margin: 0; padding: 20px; }
         #app { width: 100%; max-width: 600px; background: white; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); display: flex; flex-direction: column; height: 90vh; }
+        /* --- Header --- */
         .header { padding: 15px; background-color: #42b983; color: white; border-top-left-radius: 8px; border-top-right-radius: 8px; display: flex; justify-content: space-between; align-items: center; }
         .header h2 { margin: 0; }
         .reset-button { background-color: #e53935; color: white; border: none; padding: 8px 15px; border-radius: 5px; cursor: pointer; font-size: 14px; }
         .reset-button:hover { background-color: #c62828; }
+        /* --- Setup Area --- */
+        .setup-area { padding: 30px; display: flex; flex-direction: column; gap: 20px; }
+        .form-group { display: flex; flex-direction: column; gap: 8px; }
+        .form-group label { font-weight: bold; }
+        .form-group .description { font-size: 12px; color: #666; }
+        .form-group input[type="text"] { padding: 10px; border: 1px solid #ccc; border-radius: 5px; font-size: 16px; }
+        .position-options { display: flex; gap: 15px; }
+        /* --- Chat Area --- */
         .chat-window { flex-grow: 1; padding: 20px; overflow-y: auto; border-bottom: 1px solid #eee; }
         .message { margin-bottom: 15px; display: flex; flex-direction: column; }
         .message .content { padding: 10px 15px; border-radius: 18px; max-width: 80%; line-height: 1.5; white-space: pre-wrap; word-wrap: break-word; }
@@ -35,21 +44,52 @@
         <button @click="resetDebate" class="reset-button">リセット</button>
     </div>
 
-    <div class="chat-window" ref="chatWindow">
-        <div v-for="(msg, index) in conversationHistory" :key="index" :class="['message', msg.role]">
-            <div v-if="msg.role !== 'system'" class="content">
-                {{ msg.content }}
+    <!-- ディベート設定画面 -->
+    <div v-if="!debateStarted" class="setup-area">
+        <div class="form-group">
+            <label for="topic">ディベートのテーマ</label>
+            <input type="text" id="topic" v-model="debateTopic" placeholder="例：AIは人間の仕事を奪うか？">
+        </div>
+        <div class="form-group">
+            <label>あなたの立場</label>
+            <div class="position-options">
+                <label><input type="radio" v-model="userPosition" value="affirmative"> 肯定</label>
+                <label><input type="radio" v-model="userPosition" value="negative"> 否定</label>
             </div>
         </div>
-        <div v-if="isLoading" class="loading-indicator">
-            AIが考えています...
+        <div class="form-group">
+            <label>どちらが先に発言しますか？</label>
+            <div class="position-options">
+                <label><input type="radio" v-model="firstSpeaker" value="user"> 自分から</label>
+                <label><input type="radio" v-model="firstSpeaker" value="ai"> AIから</label>
+            </div>
+            <p v-if="firstSpeaker === 'ai'" class="description">AIが最初の意見を述べます。</p>
         </div>
+        <button @click="startDebate" :disabled="!debateTopic.trim() || !userPosition || !firstSpeaker || isLoading">
+            {{ isLoading ? '設定中...' : 'ディベート開始' }}
+        </button>
+        <div v-if="error" style="color: red; text-align: center;">{{ error }}</div>
     </div>
 
-    <form @submit.prevent="sendMessage" class="input-area">
-        <textarea v-model="userInput" placeholder="AIへの意見を入力してください..." @keydown.enter.prevent="sendMessage" :disabled="isLoading"></textarea>
-        <button type="submit" :disabled="isLoading || !userInput.trim()">送信</button>
-    </form>
+    <!-- チャット画面 -->
+    <template v-if="debateStarted">
+        <div style="padding: 5px 20px; background-color: #f0f0f0; text-align: center; font-size: 14px;">テーマ: 「{{ debateTopic }}」 / あなた: {{ userPosition === 'affirmative' ? '肯定' : '否定' }} / AI: {{ aiPositionJp }}</div>
+        <div class="chat-window" ref="chatWindow">
+            <div v-for="(msg, index) in conversationHistory" :key="index" :class="['message', msg.role]">
+                <div class="content">
+                    {{ msg.content }}
+                </div>
+            </div>
+            <div v-if="isLoading" class="loading-indicator">
+                AIが考えています...
+            </div>
+        </div>
+
+        <form @submit.prevent="sendMessage" class="input-area">
+            <textarea v-model="userInput" placeholder="AIへの意見を入力してください..." @keydown.enter.prevent="sendMessage" :disabled="isLoading"></textarea>
+            <button type="submit" :disabled="isLoading || !userInput.trim()">送信</button>
+        </form>
+    </template>
 </div>
 
 <script>
@@ -58,39 +98,86 @@ new Vue({
     data: {
         userInput: '',
         conversationHistory: [],
-        isLoading: false
+        isLoading: false,
+        debateStarted: false,
+        debateTopic: '',
+        userPosition: '', // 'affirmative' or 'negative'
+        firstSpeaker: 'user', // 'user' or 'ai'
+        aiPositionJp: '',
+        error: ''
     },
     methods: {
         resetDebate() {
-            if (confirm("会話履歴を本当にリセットしますか？")) {
+            if (confirm("ディベートをリセットして、テーマ設定画面に戻りますか？")) {
                 this.conversationHistory = [];
+                this.isLoading = false;
+                this.debateStarted = false;
+                this.debateTopic = '';
+                this.userPosition = '';
+                this.firstSpeaker = 'user';
+                this.aiPositionJp = '';
+                this.error = '';
+            }
+        },
+        async startDebate() {
+            if (!this.debateTopic.trim() || !this.userPosition || this.isLoading) return;
+            
+            this.isLoading = true;
+            this.error = '';
+
+            try {
+                const response = await fetch('/start_debate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        topic: this.debateTopic,
+                        user_position: this.userPosition
+                    })
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || 'ディベートの開始に失敗しました。');
+                }
+
+                const result = await response.json();
+                this.aiPositionJp = result.ai_position_jp;
+                this.debateStarted = true;
+
+                if (this.firstSpeaker === 'ai') {
+                    await this.sendMessage(true); // AIから開始
+                }
+
+            } catch (error) {
+                console.error('Error starting debate:', error);
+                this.error = `エラー: ${error.message}`;
+            } finally {
                 this.isLoading = false;
             }
         },
-        async sendMessage() {
-            if (!this.userInput.trim() || this.isLoading) {
-                return;
-            }
+        async sendMessage(isFirstTurnByAi = false) {
+            const userMessage = this.userInput;
+            if (!isFirstTurnByAi && (!userMessage.trim() || this.isLoading)) return;
 
             this.isLoading = true;
+            this.error = '';
 
-            if (this.conversationHistory.length === 0) {
-                // ★変更点：前置きをより強力に禁止する指示に変更
-                const systemPrompt = "あなたは、ユーザーの意見に即座に反論するAIです。いかなる場合でも、挨拶、相槌、前置き（「しかし、」「一方で、」など）を一切含めず、文章の最初から反論の核心部分だけを記述してください。あなたの役割は、ユーザーの主張に対する直接的な反論のみです。反論は250文字程度にまとめてください。";
-                this.conversationHistory.push({ role: 'system', content: systemPrompt });
+            // AIの最初のターンでなければ、ユーザーのメッセージを履歴に追加
+            if (!isFirstTurnByAi) {
+                this.conversationHistory.push({ role: 'user', content: userMessage });
+                this.userInput = '';
+                this.$nextTick(() => this.scrollToBottom());
             }
-
-            const userMessage = this.userInput;
-            this.conversationHistory.push({ role: 'user', content: userMessage });
-            this.userInput = '';
-            this.scrollToBottom();
 
             try {
                 const response = await fetch('/send_api', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        messages: this.conversationHistory 
+                        // AIの最初のターンの場合はtextは空、そうでなければユーザーの入力を送信
+                        text: isFirstTurnByAi ? '' : userMessage,
+                        // AIの最初のターンでなければ、ユーザーの最後の発言を除いた履歴を送信
+                        history: isFirstTurnByAi ? [] : this.conversationHistory.slice(0, -1)
                     })
                 });
 
@@ -104,10 +191,10 @@ new Vue({
 
             } catch (error) {
                 console.error('Error:', error);
-                this.conversationHistory.push({ role: 'assistant', content: `エラーが発生しました: ${error.message}` });
+                this.conversationHistory.push({ role: 'assistant', content: `エラー: ${error.message}` });
             } finally {
                 this.isLoading = false;
-                this.scrollToBottom();
+                this.$nextTick(() => this.scrollToBottom());
             }
         },
         scrollToBottom() {

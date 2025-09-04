@@ -1,6 +1,7 @@
 import os
 import uuid
 import re
+import atexit
 import json
 from dotenv import load_dotenv
 from flask import Flask, Response, jsonify, request, send_from_directory, session, stream_with_context
@@ -231,6 +232,15 @@ def post_message():
     except Exception as e:
         app.logger.error(f"OpenRouter API call failed: {e}")
         return jsonify({"error": f"AIサービスとの通信中にエラーが発生しました。"}), 500
+
+# --- 終了時処理 ---
+import atexit
+def cleanup_on_exit():
+    """アプリケーション終了時にdebates.jsonの中身を空にする"""
+    save_debates({})
+    print(f"Info: Contents of {DEBATES_FILE} have been cleared on exit.")
+
+atexit.register(cleanup_on_exit)
 
 # スクリプトが直接実行された場合にのみ開発サーバーを起動
 if __name__ == '__main__':

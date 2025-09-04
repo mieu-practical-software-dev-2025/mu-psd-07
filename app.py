@@ -178,7 +178,21 @@ def post_message():
     if not is_ai_first_turn:
         session['history'].append({"role": "user", "content": user_message})
 
-    messages_to_send = session['history']
+    # --- モデルに合わせたメッセージ形式の変換 ---
+    # google/gemmaモデルはsystemプロンプトをサポートしていないため、
+    # systemロールをuserロールに変換し、直後にassistantロールを挿入する
+    messages_to_send = []
+    original_history = session.get('history', [])
+    for i, msg in enumerate(original_history):
+        if msg.get('role') == 'system':
+            # systemをuserに変換
+            messages_to_send.append({'role': 'user', 'content': msg['content']})
+            # 次がassistantメッセージでなければ、空のassistantメッセージを挿入
+            if i + 1 >= len(original_history) or original_history[i+1].get('role') != 'assistant':
+                messages_to_send.append({'role': 'assistant', 'content': ''})
+        else:
+            messages_to_send.append(msg)
+    # -----------------------------------------
 
     try:
         # ストリーミング応答

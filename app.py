@@ -1,5 +1,6 @@
 import os
 import uuid
+import re
 import json
 from dotenv import load_dotenv
 from flask import Flask, Response, jsonify, request, send_from_directory, session, stream_with_context
@@ -145,6 +146,16 @@ def get_history():
     if 'session_id' in session and 'history' in session:
         return jsonify({"session_id": session['session_id'], "history": session['history']})
     return jsonify({"error": "No active session found"}), 404
+
+@app.route('/api/debates/clear', methods=['POST'])
+def clear_all_debates():
+    """すべてのディベート履歴と現在のセッションをクリアする"""
+    # debates.jsonを空にする
+    save_debates({})
+    # Flaskのセッションをクリアする
+    session.clear()
+    app.logger.info("All debate histories and session have been cleared.")
+    return jsonify({"message": "すべての履歴が正常にクリアされました。"}), 200
 
 @app.route('/api/debate/message', methods=['POST'])
 def post_message():

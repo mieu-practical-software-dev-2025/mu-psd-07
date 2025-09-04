@@ -30,6 +30,8 @@
         .header h2 { margin: 0; }
         .reset-button { background-color: var(--accent-color); color: var(--text-light); border: none; padding: 8px 15px; border-radius: 5px; cursor: pointer; font-size: 14px; transition: background-color 0.3s; }
         .reset-button:hover { background-color: #c62828; }
+        .pause-button { background-color: #757575; margin-right: 10px; }
+        .pause-button:hover { background-color: #616161; }
 
         .setup-card { padding: 30px 20px; text-align: center; border-bottom: 1px solid var(--border-color); }
         .setup-card h3 { color: var(--text-dark); margin-top: 0; margin-bottom: 15px; font-weight: 700; }
@@ -101,7 +103,10 @@
 <div id="app">
     <div class="header">
         <h2>AIディベート</h2>
-        <button @click="resetDebate" class="reset-button">リセット</button>
+        <div>
+            <button v-if="isStarted" @click="pauseDebate" class="reset-button pause-button">中断</button>
+            <button @click="resetDebate" class="reset-button">リセット</button>
+        </div>
     </div>
 
     <div v-if="!debateTheme" class="setup-card">
@@ -143,7 +148,7 @@
             <div v-if="msg.role !== 'system'" class="message-body">
                 <img :src="msg.role === 'assistant' ? '/static/AI.png' : '/static/human.png'" class="icon">
                 <div class="content">
-                    {{ msg.content }}
+                    {{ msg.content.trim() }}
                 </div>
             </div>
         </div>
@@ -200,8 +205,9 @@ new Vue({
         }
     },
     methods: {
-        resetDebate() {
-            if (confirm("会話履歴を本当にリセットしますか？")) {
+        pauseDebate() {
+            if (confirm("ディベートを中断してトップ画面に戻りますか？\n（履歴は保存され、後から再開できます）")) {
+                // フロントエンドの状態のみをリセット
                 this.userInput = '';
                 this.themeInput = '';
                 this.debateTheme = '';
@@ -209,11 +215,36 @@ new Vue({
                 this.aiStance = '';
                 this.isStarted = false;
                 this.initialMessage = '';
-                this.sessionId = null;
+                // sessionIdは保持しても良いが、混乱を避けるためクリア
+                this.sessionId = null; 
                 this.conversationHistory = [];
-                this.isLoading = false;
-                this.isHistoryModalVisible = false;
-                this.debateHistoryList = [];
+            }
+        },
+        async resetDebate() {
+            if (confirm("会話履歴を本当にリセットしますか？")) {
+                try {
+                    const response = await fetch('/api/debates/clear', { method: 'POST' });
+                    if (!response.ok) {
+                        throw new Error('サーバーでの履歴クリアに失敗しました。');
+                    }
+                    // フロントエンドの状態をリセット
+                    this.userInput = '';
+                    this.themeInput = '';
+                    this.debateTheme = '';
+                    this.userStance = null;
+                    this.aiStance = '';
+                    this.isStarted = false;
+                    this.initialMessage = '';
+                    this.sessionId = null;
+                    this.conversationHistory = [];
+                    this.isLoading = false;
+                    this.isHistoryModalVisible = false;
+                    this.debateHistoryList = [];
+                    alert('すべての履歴がクリアされました。');
+                } catch (error) {
+                    console.error('Error clearing history:', error);
+                    alert(error.message);
+                }
             }
         },
         startDebate() {

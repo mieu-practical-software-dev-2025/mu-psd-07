@@ -6,7 +6,6 @@
     <title>AI Debate App</title>
     <!-- Vue.jsを読み込み -->
     <script src="https://cdn.jsdelivr.net/npm/vue@2"></script>
-    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -30,8 +29,6 @@
         .header h2 { margin: 0; }
         .reset-button { background-color: var(--accent-color); color: var(--text-light); border: none; padding: 8px 15px; border-radius: 5px; cursor: pointer; font-size: 14px; transition: background-color 0.3s; }
         .reset-button:hover { background-color: #c62828; }
-        .pause-button { background-color: #757575; margin-right: 10px; }
-        .pause-button:hover { background-color: #616161; }
 
         .setup-card { padding: 30px 20px; text-align: center; border-bottom: 1px solid var(--border-color); }
         .setup-card h3 { color: var(--text-dark); margin-top: 0; margin-bottom: 15px; font-weight: 700; }
@@ -39,10 +36,6 @@
         .setup-card input { width: 80%; padding: 12px; border-radius: 8px; border: 1px solid var(--border-color); font-size: 16px; transition: border-color 0.3s, box-shadow 0.3s; }
         .setup-card input:focus { border-color: var(--primary-color); box-shadow: 0 0 0 3px var(--primary-light); outline: none; }
         .setup-card .button-group { display: flex; justify-content: center; gap: 15px; }
-
-        .chat-header { padding: 10px 20px; background: var(--bg-light); border-bottom: 1px solid var(--border-color); text-align: center; }
-        .chat-header-theme { font-weight: bold; color: var(--text-dark); margin: 0; }
-        .chat-header-stance { font-size: 0.9em; color: #555; margin: 5px 0 0 0; }
 
         .chat-window { flex-grow: 1; padding: 20px; overflow-y: auto; background-color: #f9f9f9; }
         .message { margin-bottom: 15px; display: flex; flex-direction: column; }
@@ -78,23 +71,6 @@
         button:hover:not(:disabled) { background-color: #36a873; }
         button:active:not(:disabled) { transform: scale(0.98); }
         button:disabled { background-color: #a5d6b8; cursor: not-allowed; }
-
-        /* モーダル */
-        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: flex; justify-content: center; align-items: center; z-index: 1000; }
-        .modal-content { background: white; padding: 20px; border-radius: 8px; width: 90%; max-width: 500px; max-height: 80vh; overflow-y: auto; }
-        .modal-content h3 { margin-top: 0; }
-        .history-list { list-style: none; padding: 0; }
-        .history-item { padding: 15px; border-bottom: 1px solid var(--border-color); cursor: pointer; transition: background-color 0.2s; }
-        .history-item:hover { background-color: var(--bg-light); }
-        .history-item:last-child { border-bottom: none; }
-        .history-theme { font-weight: bold; color: var(--text-dark); }
-        .history-id { font-size: 0.8em; color: #777; margin-top: 5px; }
-        .modal-close-button { background: var(--accent-color); margin-top: 20px; }
-
-        .secondary-button {
-            background-color: #757575;
-        }
-        .secondary-button:hover { background-color: #616161; }
         .loading-indicator { text-align: center; color: #888; }
     </style>
 </head>
@@ -103,21 +79,15 @@
 <div id="app">
     <div class="header">
         <h2>AIディベート</h2>
-        <div>
-            <button v-if="isStarted" @click="pauseDebate" class="reset-button pause-button">中断</button>
-            <button @click="resetDebate" class="reset-button">リセット</button>
-        </div>
+        <button @click="resetDebate" class="reset-button">リセット</button>
     </div>
 
     <div v-if="!debateTheme" class="setup-card">
         <h3>ディベートのテーマを入力してください</h3>
-        <div class="button-group" style="flex-direction: column; align-items: center; gap: 10px;">
-            <form @submit.prevent="startDebate" style="width: 100%; display: flex; justify-content: center;">
-                <input v-model="themeInput" placeholder="例：AIは人間の仕事を奪うか" />
-                <button type="submit" :disabled="!themeInput.trim()">開始</button>
-            </form>
-            <button @click="showHistoryModal" class="secondary-button">過去のディベート履歴</button>
-        </div>
+        <form @submit.prevent="startDebate">
+            <input v-model="themeInput" placeholder="例：AIは人間の仕事を奪うか" />
+            <button type="submit" :disabled="!themeInput.trim()">開始</button>
+        </form>
     </div>
 
     <div v-if="debateTheme && !userStance" class="setup-card">
@@ -137,18 +107,12 @@
         </div>
     </div>
 
-    <div v-if="isStarted" class="chat-header">
-        <p class="chat-header-theme">テーマ: 「{{ debateTheme }}」</p>
-        <p class="chat-header-stance">あなたの立場: {{ userStanceText }} / 
-            <span style="font-weight: bold;">AIの立場: {{ aiStance }}</span></p>
-    </div>
-
     <div v-if="isStarted" class="chat-window" ref="chatWindow">
         <div v-for="(msg, index) in conversationHistory" :key="index" :class="['message', msg.role]">
             <div v-if="msg.role !== 'system'" class="message-body">
                 <img :src="msg.role === 'assistant' ? '/static/AI.png' : '/static/human.png'" class="icon">
                 <div class="content">
-                    {{ msg.content.trim() }}
+                    {{ msg.content }}
                 </div>
             </div>
         </div>
@@ -163,21 +127,6 @@
             <button type="submit" :disabled="isLoading || !userInput.trim()">送信</button>
         </form>
     </div>
-
-    <!-- 履歴モーダル -->
-    <div v-if="isHistoryModalVisible" class="modal-overlay" @click.self="closeHistoryModal">
-        <div class="modal-content">
-            <h3>過去のディベート履歴</h3>
-            <ul class="history-list">
-                <li v-for="item in debateHistoryList" :key="item.session_id" @click="loadDebate(item.session_id)" class="history-item">
-                    <div class="history-theme">{{ item.theme }}</div>
-                    <div class="history-id">ID: {{ item.session_id.substring(0, 8) }}...</div>
-                </li>
-                <li v-if="debateHistoryList.length === 0">履歴はありません。</li>
-            </ul>
-            <button @click="closeHistoryModal" class="modal-close-button">閉じる</button>
-        </div>
-    </div>
 </div>
 
 <script>
@@ -188,63 +137,22 @@ new Vue({
         themeInput: '',
         debateTheme: '',
         userStance: null, // 'pro' (肯定派) or 'con' (否定派)
-        aiStance: '', // AIの立場
         isStarted: false,
         initialMessage: '',
-        sessionId: null,
         conversationHistory: [],
-        isLoading: false,
-        isHistoryModalVisible: false,
-        debateHistoryList: []
-    },
-    computed: {
-        userStanceText() {
-            if (this.userStance === 'pro') return '肯定派';
-            if (this.userStance === 'con') return '否定派';
-            return '（復元）';
-        }
+        isLoading: false
     },
     methods: {
-        pauseDebate() {
-            if (confirm("ディベートを中断してトップ画面に戻りますか？\n（履歴は保存され、後から再開できます）")) {
-                // フロントエンドの状態のみをリセット
+        resetDebate() {
+            if (confirm("会話履歴を本当にリセットしますか？")) {
                 this.userInput = '';
                 this.themeInput = '';
                 this.debateTheme = '';
                 this.userStance = null;
-                this.aiStance = '';
                 this.isStarted = false;
                 this.initialMessage = '';
-                // sessionIdは保持しても良いが、混乱を避けるためクリア
-                this.sessionId = null; 
                 this.conversationHistory = [];
-            }
-        },
-        async resetDebate() {
-            if (confirm("会話履歴を本当にリセットしますか？")) {
-                try {
-                    const response = await fetch('/api/debates/clear', { method: 'POST' });
-                    if (!response.ok) {
-                        throw new Error('サーバーでの履歴クリアに失敗しました。');
-                    }
-                    // フロントエンドの状態をリセット
-                    this.userInput = '';
-                    this.themeInput = '';
-                    this.debateTheme = '';
-                    this.userStance = null;
-                    this.aiStance = '';
-                    this.isStarted = false;
-                    this.initialMessage = '';
-                    this.sessionId = null;
-                    this.conversationHistory = [];
-                    this.isLoading = false;
-                    this.isHistoryModalVisible = false;
-                    this.debateHistoryList = [];
-                    alert('すべての履歴がクリアされました。');
-                } catch (error) {
-                    console.error('Error clearing history:', error);
-                    alert(error.message);
-                }
+                this.isLoading = false;
             }
         },
         startDebate() {
@@ -254,37 +162,16 @@ new Vue({
         },
         selectStance(stance) {
             this.userStance = stance;
-            this.aiStance = (stance === 'pro') ? '否定派' : '肯定派';
-            const userStanceText = this.userStanceText;
+            const aiStance = (stance === 'pro') ? '否定派' : '肯定派';
+            const userStanceText = (stance === 'pro') ? '肯定派' : '否定派';
+
+            // ★変更点：システムプロンプトを更新し、後攻の場合の指示を追加
+            const systemPrompt = `あなたは、ディベートAIです。テーマは「${this.debateTheme}」です。あなたは「${aiStance}」の立場で議論します。ユーザーの意見に即座に反論してください。いかなる場合でも、挨拶、相槌、前置き（「しかし、」「一方で、」など）を一切含めず、文章の最初から反論の核心部分だけを記述してください。あなたの役割は、ユーザーの主張に対する直接的な反論のみです。反論は250文字程度にまとめてください。もしユーザーが後攻を選び、あなたが最初の発言者になった場合は、テーマに対してあなたの立場から最初の意見を述べてください。`;
+            this.conversationHistory.push({ role: 'system', content: systemPrompt });
 
             this.initialMessage = `テーマ「${this.debateTheme}」について、ディベートを開始します。あなたは「${userStanceText}」です。`;
         },
-        async setTurn(isUserFirst) {
-            
-            const systemPrompt = `あなたは、ディベートAIです。テーマは「${this.debateTheme}」です。あなたは「${this.aiStance}」の立場で議論します。ユーザーの意見に即座に反論してください。いかなる場合でも、挨拶、相槌、前置き（「しかし、」「一方で、」など）を一切含めず、文章の最初から反論の核心部分だけを記述してください。あなたの役割は、ユーザーの主張に対する直接的な反論のみです。反論は250文字程度にまとめてください。もしユーザーが後攻を選び、あなたが最初の発言者になった場合は、テーマに対してあなたの立場から最初の意見を述べてください。`;
-            
-            let initialDisplayMessage = "";
-            if (isUserFirst) {
-                initialDisplayMessage = `${this.initialMessage} あなたの意見をどうぞ。`;
-            } else {
-                initialDisplayMessage = `${this.initialMessage} AIが最初の意見を述べます。`;
-            }
-
-            try {
-                const response = await fetch('/api/debate/start', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ system_prompt: systemPrompt, initial_message: initialDisplayMessage })
-                });
-                const data = await response.json();
-                this.sessionId = data.session_id;
-                this.conversationHistory = data.history.filter(m => m.role !== 'system');
-            } catch (error) {
-                console.error("Failed to start debate:", error);
-                alert("ディベートの開始に失敗しました。");
-                return;
-            }
-
+        setTurn(isUserFirst) {
             this.isStarted = true;
             this.$nextTick(() => { // DOMが更新されるのを待つ
                 if (isUserFirst) {
@@ -292,55 +179,73 @@ new Vue({
                     this.conversationHistory.push({ role: 'assistant', content: `${this.initialMessage} あなたの意見をどうぞ。` });
                 } else {
                     // AIが先攻の場合
-                    this.sendMessage(true); // AIが先攻であることを示すフラグを渡す
+                    this.conversationHistory.push({ role: 'assistant', content: `${this.initialMessage} AIが最初の意見を述べます。` });
+                    this.fetchAiFirstTurn();
                 }
             });
         },
-        async sendMessage(isAiFirstTurn = false) {
-            if ((!this.userInput.trim() && !isAiFirstTurn) || this.isLoading) {
+        async sendMessage() {
+            // isAiFirstTurn 引数を削除
+            if (!this.userInput.trim() || this.isLoading) {
                 return;
             }
             this.isLoading = true;
-            
-            if (!isAiFirstTurn) {
-                const userMessage = this.userInput;
-                this.conversationHistory.push({ role: 'user', content: userMessage });
-                this.userInput = '';
-                this.scrollToBottom();
-            }
 
-            // ストリーミング表示のために、まずアシスタントの空メッセージを追加
-            const assistantMessage = { role: 'assistant', content: '' };
-            this.conversationHistory.push(assistantMessage);
+            // AIが先攻の場合のロジックを削除
+            const userMessage = this.userInput;
+            this.conversationHistory.push({ role: 'user', content: userMessage });
+            this.userInput = '';
+            this.scrollToBottom();
 
             try {
-                const response = await fetch('/api/debate/message', {
+                const response = await fetch('/send_api', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        message: this.userInput,
-                        is_ai_first_turn: isAiFirstTurn
+                        messages: this.conversationHistory 
                     })
                 });
 
                 if (!response.ok) {
                     const errorData = await response.json();
-                    throw new Error(errorData.error || `サーバーエラー: ${response.status}`);
+                    throw new Error(errorData.error || 'サーバーでエラーが発生しました。');
                 }
 
-                // ストリームを処理
-                const reader = response.body.getReader();
-                const decoder = new TextDecoder();
-                while (true) {
-                    const { done, value } = await reader.read();
-                    if (done) break;
-                    assistantMessage.content += decoder.decode(value, { stream: true });
-                    this.scrollToBottom(); // コンテンツが追加されるたびにスクロール
-                }
+                const data = await response.json();
+                this.conversationHistory.push({ role: 'assistant', content: data.processed_text });
 
             } catch (error) {
                 console.error('Error:', error);
-                assistantMessage.content = `エラーが発生しました: ${error.message}`;
+                this.conversationHistory.push({ role: 'assistant', content: `エラーが発生しました: ${error.message}` });
+            } finally {
+                this.isLoading = false;
+                this.scrollToBottom();
+            }
+        },
+        async fetchAiFirstTurn() {
+            this.isLoading = true;
+            this.scrollToBottom();
+            // AIの最初のターンを促すために、現在の会話履歴（システムプロンプトと案内メッセージ）をAPIに送る
+            try {
+                const response = await fetch('/send_api', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        messages: this.conversationHistory
+                    })
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || 'サーバーでエラーが発生しました。');
+                }
+
+                const data = await response.json();
+                this.conversationHistory.push({ role: 'assistant', content: data.processed_text });
+
+            } catch (error) {
+                console.error('Error:', error);
+                this.conversationHistory.push({ role: 'assistant', content: `エラーが発生しました: ${error.message}` });
             } finally {
                 this.isLoading = false;
                 this.scrollToBottom();
@@ -353,72 +258,6 @@ new Vue({
                     chatWindow.scrollTop = chatWindow.scrollHeight;
                 }
             });
-        },
-        async showHistoryModal() {
-            try {
-                const response = await fetch('/api/debates');
-                if (!response.ok) throw new Error('Failed to fetch history list.');
-                this.debateHistoryList = await response.json();
-                this.isHistoryModalVisible = true;
-            } catch (error) {
-                console.error(error);
-                alert('履歴の取得に失敗しました。');
-            }
-        },
-        closeHistoryModal() {
-            this.isHistoryModalVisible = false;
-        },
-        async loadDebate(sessionId) {
-            this.isLoading = true;
-            this.closeHistoryModal();
-            try {
-                const response = await fetch(`/api/debate/${sessionId}`);
-                if (!response.ok) throw new Error('Failed to load debate.');
-                const data = await response.json();
-                
-                this.sessionId = data.session_id;
-                this.debateTheme = data.theme;
-                this.aiStance = data.ai_stance;
-                this.conversationHistory = data.history.filter(m => m.role !== 'system');
-                
-                // 状態を復元
-                this.isStarted = true;
-                // ユーザーの立場をAIの立場から逆算
-                if (this.aiStance === '肯定派') this.userStance = 'con';
-                else if (this.aiStance === '否定派') this.userStance = 'pro';
-                else this.userStance = null; // 不明な場合
-                this.scrollToBottom();
-            } catch (error) {
-                console.error(error);
-                alert('ディベートの読み込みに失敗しました。');
-            } finally {
-                this.isLoading = false;
-            }
-        }
-    },
-    async created() {
-        // ページ読み込み時にサーバーにセッション履歴を問い合わせる
-        try {
-            const response = await fetch('/api/debate/history');
-            if (response.ok) {
-                const data = await response.json();
-                this.sessionId = data.session_id;
-                // 履歴からシステムプロンプトを除外してUIに表示
-                const systemPrompt = data.history.find(m => m.role === 'system')?.content || '';
-                const themeMatch = systemPrompt.match(/テーマは「([^」]+)」/);
-                this.debateTheme = themeMatch ? themeMatch[1] : "（復元されたディベート）";
-                const stanceMatch = systemPrompt.match(/あなたは「([^」]+)」の立場で議論します/);
-                this.aiStance = stanceMatch ? stanceMatch[1] : "（復元）";
-                if (this.aiStance === '肯定派') this.userStance = 'con';
-                else if (this.aiStance === '否定派') this.userStance = 'pro';
-                else this.userStance = null;
-                this.conversationHistory = data.history.filter(m => m.role !== 'system');
-                // 状態を復元
-                this.isStarted = true;
-                this.scrollToBottom();
-            }
-        } catch (error) {
-            console.log("No active session found on server. Starting fresh.");
         }
     }
 

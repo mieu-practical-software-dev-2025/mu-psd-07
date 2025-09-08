@@ -156,7 +156,11 @@ new Vue({
             }
         },
         startDebate() {
-            if (!this.themeInput.trim()) return;
+            const trimmedTheme = this.themeInput.trim();
+            if (trimmedTheme.length < 5) {
+                alert("ディベートのテーマは5文字以上で入力してください。");
+                return;
+            }
             this.debateTheme = this.themeInput;
             this.themeInput = ''; // 入力欄をクリア
         },

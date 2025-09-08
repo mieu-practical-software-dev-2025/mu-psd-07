@@ -74,6 +74,15 @@ def send_api():
                  return jsonify({"error": "Each message must have 'role' and 'content'"}), 400
         app.logger.info(f"Received message history with {len(messages)} entries.")
 
+        # ディベートテーマのバリデーション
+        system_prompt = next((msg['content'] for msg in messages if msg['role'] == 'system'), None)
+        if system_prompt:
+            # "テーマは「...」です。" の部分からテーマを抽出
+            theme_start = system_prompt.find('「')
+            theme_end = system_prompt.find('」', theme_start)
+            if theme_start != -1 and theme_end != -1 and (theme_end - theme_start - 1) < 5:
+                return jsonify({"error": "Debate theme is too short. Please provide a more descriptive theme."}), 400
+
     # 旧形式: 'text' と 'context' を受け取る（後方互換性のため）
     elif 'text' in data:
         received_text = data.get('text', '').strip()

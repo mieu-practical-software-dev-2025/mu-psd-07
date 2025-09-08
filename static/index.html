@@ -257,6 +257,33 @@
             box-shadow: none;
         }
         
+        /* Validation Result Area */
+        .validation-result {
+            margin-top: 25px;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: left;
+            border-width: 1px;
+            border-style: solid;
+        }
+        .validation-result.appropriate {
+            background-color: #EBF4FF; /* Blue-100 */
+            border-color: #90CDF4; /* Blue-300 */
+            color: #2C5282; /* Blue-800 */
+        }
+        .validation-result.inappropriate {
+            background-color: #FFF5F5; /* Red-100 */
+            border-color: #FEB2B2; /* Red-300 */
+            color: #9B2C2C; /* Red-800 */
+        }
+        .validation-result strong {
+            font-weight: 700;
+        }
+        .validation-result p {
+            margin: 5px 0 0 0;
+            font-size: 14px;
+        }
+
         /* Start Debate Button */
         .start-debate-button {
             width: 100%; 
@@ -300,27 +327,39 @@
         <h3>ディベートの設定</h3>
         <div class="form-group">
             <label for="topic">ディベートのテーマ</label>
-            <input type="text" id="topic" v-model="debateTopic" placeholder="例：AIは人間の仕事を奪うか？">
+            <input type="text" id="topic" v-model="debateTopic" placeholder="例：AIは人間の仕事を奪うか？" :disabled="isLoading">
         </div>
-        <div class="form-group">
-            <label>あなたの立場</label>
-            <div class="radio-group">
-                <input type="radio" id="pos-pro" v-model="userPosition" value="pro">
-                <label for="pos-pro">肯定</label>
-                <input type="radio" id="pos-con" v-model="userPosition" value="con">
-                <label for="pos-con">否定</label>
+
+        <!-- テーマチェック結果表示 -->
+        <div v-if="validationResult.judgement" :class="['validation-result', validationResult.judgement === '適切' ? 'appropriate' : 'inappropriate']">
+            <strong>判定: {{ validationResult.judgement }}</strong>
+            <p>{{ validationResult.reason }}</p>
+        </div>
+
+        <!-- テーマが適切と判断されたら表示 -->
+        <div v-if="isThemeValid">
+            <div class="form-group" style="margin-top: 25px;">
+                <label>あなたの立場</label>
+                <div class="radio-group">
+                    <input type="radio" id="pos-pro" v-model="userPosition" value="pro">
+                    <label for="pos-pro">肯定</label>
+                    <input type="radio" id="pos-con" v-model="userPosition" value="con">
+                    <label for="pos-con">否定</label>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>先攻 / 後攻</label>
+                <div class="radio-group">
+                    <input type="radio" id="turn-user" v-model="firstSpeaker" value="user">
+                    <label for="turn-user">先攻（自分から）</label>
+                    <input type="radio" id="turn-ai" v-model="firstSpeaker" value="ai">
+                    <label for="turn-ai">後攻（AIから）</label>
+                </div>
             </div>
         </div>
-        <div class="form-group">
-            <label>先攻 / 後攻</label>
-            <div class="radio-group">
-                <input type="radio" id="turn-user" v-model="firstSpeaker" value="user">
-                <label for="turn-user">先攻（自分から）</label>
-                <input type="radio" id="turn-ai" v-model="firstSpeaker" value="ai">
-                <label for="turn-ai">後攻（AIから）</label>
-            </div>
-        </div>
-        <button @click="startDebate" :disabled="!debateTopic.trim() || !userPosition || !firstSpeaker || isLoading" class="start-debate-button">
+
+        <button v-if="!isThemeValid" @click="validateTheme" :disabled="!debateTopic.trim() || isLoading" class="start-debate-button">テーマをチェック</button>
+        <button v-if="isThemeValid" @click="startDebate" :disabled="!userPosition || !firstSpeaker || isLoading" class="start-debate-button">
             ディベート開始
         </button>
         <div v-if="error" style="color: red; text-align: center; margin-top: 15px;">{{ error }}</div>
@@ -362,7 +401,14 @@ new Vue({
         userPosition: '', // 'pro' or 'con'
         firstSpeaker: '', // 'user' or 'ai'
         aiPositionJp: '',
-        error: ''
+        error: '',
+        validationResult: { judgement: null, reason: null } // テーマの妥当性チェック結果
+    },
+    computed: {
+        isThemeValid() {
+            // テーマが「適切」と判断された場合にtrueを返す
+            return this.validationResult.judgement === '適切';
+        }
     },
     methods: {
         resetDebate() {
@@ -376,14 +422,17 @@ new Vue({
                 this.firstSpeaker = '';
                 this.aiPositionJp = '';
                 this.error = '';
+                this.validationResult = { judgement: null, reason: null };
             }
         },
         formatMessage(content) {
             // 簡単な書式設定（XSSに注意が必要ですが、今回はデモのため簡易的に実装）
             return content.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
         },
-        startDebate() {
-            if (!this.debateTopic.trim() || !this.userPosition || !this.firstSpeaker || this.isLoading) return;
+        async startDebate() {
+            if (!this.isThemeValid || !this.userPosition || !this.firstSpeaker || this.isLoading) return;
+
+            this.error = ''; // エラーをクリア
 
             this.debateStarted = true;
 
@@ -406,6 +455,34 @@ new Vue({
                     this.fetchAiFirstTurn();
                 }
             });
+        },
+        async validateTheme() {
+            if (!this.debateTopic.trim() || this.isLoading) return;
+
+            this.isLoading = true;
+            this.error = '';
+            this.validationResult = { judgement: null, reason: null }; // 結果をリセット
+
+            try {
+                const response = await fetch('/validate_theme', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ theme: this.debateTopic })
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || 'テーマのチェック中にエラーが発生しました。');
+                }
+
+                this.validationResult = await response.json();
+
+            } catch (error) {
+                console.error('Error:', error);
+                this.error = error.message;
+            } finally {
+                this.isLoading = false;
+            }
         },
         async sendMessage() {
             if (!this.userInput.trim() || this.isLoading) {
@@ -446,13 +523,17 @@ new Vue({
         async fetchAiFirstTurn() {
             this.isLoading = true;
             this.scrollToBottom();
-            // AIの最初のターンを促すために、現在の会話履歴（システムプロンプトと案内メッセージ）をAPIに送る
+            // AIの最初のターンを促すために、APIにシステムプロンプトのみを送信します。
+            // フロントエンド表示用の案内メッセージ（「AIが最初の意見を述べます」など）はAPIに送信しません。
+            const apiMessages = this.conversationHistory.filter(msg => msg.role === 'system');
+
             try {
                 const response = await fetch('/send_api', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        messages: this.conversationHistory
+                        // 表示用の案内メッセージを除いた、API用のメッセージ履歴を送信
+                        messages: apiMessages
                     })
                 });
 

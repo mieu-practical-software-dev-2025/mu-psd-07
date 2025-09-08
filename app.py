@@ -115,6 +115,68 @@ def send_api():
         # クライアントには具体的なエラー詳細を返しすぎないように注意
         return jsonify({"error": f"AIサービスとの通信中にエラーが発生しました。"}), 500
 
+# URL:/validate_theme に対するメソッドを定義
+@app.route('/validate_theme', methods=['POST'])
+def validate_theme():
+    """ディベートのテーマが適切かAIに判断させるエンドポイント"""
+    if not client:
+        app.logger.error("OpenRouter API key not configured.")
+        return jsonify({"error": "OpenRouter API key is not configured on the server."}), 500
+
+    data = request.get_json()
+    if not data or 'theme' not in data:
+        return jsonify({"error": "Request must contain 'theme'"}), 400
+
+    theme = data['theme'].strip()
+    if not theme:
+        return jsonify({"error": "'theme' cannot be empty"}), 400
+
+    # AIにテーマの妥当性を判断させるためのシステムプロンプト
+    validation_system_prompt = """あなたはディベートの審判です。ユーザーから提案されたテーマが、2者間でのディベートのテーマとして適切かどうかを判断してください。
+判断基準は以下の通りです。
+1. 賛成と反対の明確な立場が存在するか？
+2. 倫理的に問題のあるテーマではないか？
+3. 非常に個人的な、または主観的すぎるテーマではないか？
+4. ある程度の議論の広がりが期待できるか？
+
+上記の基準に基づき、最終的な判断を「適切」または「不適切」のいずれかで示し、その理由を簡潔に説明してください。
+回答はJSON形式で、'judgement' (適切/不適切) と 'reason' (理由) の2つのキーを持つオブジェクトとしてください。
+例: {"judgement": "適切", "reason": "賛成と反対の立場が明確で、公共の関心事について多角的な議論が期待できるため。"}
+例: {"judgement": "不適切", "reason": "これは個人の好みの問題であり、客観的な議論には向いていません。"}
+"""
+
+    messages = [
+        {"role": "system", "content": validation_system_prompt},
+        {"role": "user", "content": theme}
+    ]
+
+    try:
+        app.logger.info(f"Validating debate theme: {theme}")
+        chat_completion = client.chat.completions.create(
+            model=DEFAULT_MODEL,
+            messages=messages,
+        )
+
+        ai_response = chat_completion.choices[0].message.content
+        app.logger.info(f"AI validation response: {ai_response}")
+
+        # AIの応答がMarkdownのコードブロック（```json ... ```）で囲まれている場合を考慮して、
+        # 中身のJSON部分だけを抽出する
+        cleaned_response = ai_response.strip()
+        if cleaned_response.startswith("```json"):
+            cleaned_response = cleaned_response[7:] # "```json" を削除
+        if cleaned_response.endswith("```"):
+            cleaned_response = cleaned_response[:-3] # "```" を削除
+        
+        # 整形されたJSON文字列をクライアントに返す
+        # Flaskは自動的に辞書をJSONに変換してくれるが、今回は文字列をそのまま返すため、
+        # ヘッダーを明示的に指定する
+        return cleaned_response.strip(), 200, {'Content-Type': 'application/json; charset=utf-8'}
+
+    except Exception as e:
+        app.logger.error(f"Error during theme validation: {e}")
+        return jsonify({"error": "テーマの妥当性チェック中にAIサービスでエラーが発生しました。"}), 500
+
 # スクリプトが直接実行された場合にのみ開発サーバーを起動
 if __name__ == '__main__':
     # 起動時の警告はクライアント初期化時にapp.loggerで行うように変更

@@ -6,32 +6,70 @@
     <title>AI Debate App</title>
     <!-- Vue.jsを読み込み -->
     <script src="https://cdn.jsdelivr.net/npm/vue@2"></script>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap" rel="stylesheet">
     <style>
-        body { font-family: sans-serif; display: flex; justify-content: center; background-color: #f4f4f9; margin: 0; padding: 20px; }
+        :root {
+            --primary-color: #42b983;
+            --primary-light: #e0f2f1;
+            --accent-color: #e53935;
+            --accent-light: #ffcdd2;
+            --text-dark: #2c3e50;
+            --text-light: #ffffff;
+            --bg-light: #f4f4f9;
+            --bg-white: #ffffff;
+            --border-color: #e0e0e0;
+        }
+
+        body { font-family: 'Noto Sans JP', sans-serif; display: flex; justify-content: center; background-color: var(--bg-light); margin: 0; padding: 20px; }
         #app { width: 100%; max-width: 600px; background: white; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); display: flex; flex-direction: column; height: 90vh; }
-        /* --- Header --- */
-        .header { padding: 15px; background-color: #42b983; color: white; border-top-left-radius: 8px; border-top-right-radius: 8px; display: flex; justify-content: space-between; align-items: center; }
+        .header { padding: 15px 20px; background-color: var(--primary-color); color: var(--text-light); border-top-left-radius: 8px; border-top-right-radius: 8px; display: flex; justify-content: space-between; align-items: center; }
         .header h2 { margin: 0; }
-        .reset-button { background-color: #e53935; color: white; border: none; padding: 8px 15px; border-radius: 5px; cursor: pointer; font-size: 14px; }
+        .reset-button { background-color: var(--accent-color); color: var(--text-light); border: none; padding: 8px 15px; border-radius: 5px; cursor: pointer; font-size: 14px; transition: background-color 0.3s; }
         .reset-button:hover { background-color: #c62828; }
-        /* --- Setup Area --- */
-        .setup-area { padding: 30px; display: flex; flex-direction: column; gap: 20px; }
-        .form-group { display: flex; flex-direction: column; gap: 8px; }
-        .form-group label { font-weight: bold; }
-        .form-group .description { font-size: 12px; color: #666; }
-        .form-group input[type="text"] { padding: 10px; border: 1px solid #ccc; border-radius: 5px; font-size: 16px; }
-        .position-options { display: flex; gap: 15px; }
-        /* --- Chat Area --- */
-        .chat-window { flex-grow: 1; padding: 20px; overflow-y: auto; border-bottom: 1px solid #eee; }
+
+        .setup-card { padding: 30px 20px; text-align: center; border-bottom: 1px solid var(--border-color); }
+        .setup-card h3 { color: var(--text-dark); margin-top: 0; margin-bottom: 15px; font-weight: 700; }
+        .setup-card p { color: #555; margin-bottom: 25px; }
+        .setup-card input { width: 80%; padding: 12px; border-radius: 8px; border: 1px solid var(--border-color); font-size: 16px; transition: border-color 0.3s, box-shadow 0.3s; }
+        .setup-card input:focus { border-color: var(--primary-color); box-shadow: 0 0 0 3px var(--primary-light); outline: none; }
+        .setup-card .button-group { display: flex; justify-content: center; gap: 15px; }
+
+        .chat-window { flex-grow: 1; padding: 20px; overflow-y: auto; background-color: #f9f9f9; }
         .message { margin-bottom: 15px; display: flex; flex-direction: column; }
-        .message .content { padding: 10px 15px; border-radius: 18px; max-width: 80%; line-height: 1.5; white-space: pre-wrap; word-wrap: break-word; }
+        .message-body { display: flex; align-items: flex-start; max-width: 90%; }
+        .icon { width: 40px; height: 40px; border-radius: 50%; margin-right: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); flex-shrink: 0; }
+        .content { position: relative; padding: 10px 15px; border-radius: 18px; line-height: 1.6; white-space: pre-wrap; word-wrap: break-word; box-shadow: 0 2px 5px rgba(0,0,0,0.08); }
+        
         .message.user { align-items: flex-end; }
-        .message.user .content { background-color: #42b983; color: white; }
+        .message.user .message-body { flex-direction: row-reverse; }
+        .message.user .icon { margin-right: 0; margin-left: 10px; }
+        .message.user .content { background-color: var(--primary-color); color: var(--text-light); }
+        .message.user .content::before {
+            content: ''; position: absolute; top: 12px; right: -8px;
+            border-top: 8px solid transparent;
+            border-bottom: 8px solid transparent;
+            border-left: 10px solid var(--primary-color);
+        }
+
         .message.assistant { align-items: flex-start; }
-        .message.assistant .content { background-color: #e9e9eb; color: #333; }
-        .input-area { display: flex; padding: 15px; border-top: 1px solid #ddd; }
-        textarea { flex-grow: 1; border: 1px solid #ccc; border-radius: 5px; padding: 10px; font-size: 16px; resize: none; }
-        button { background-color: #42b983; color: white; border: none; padding: 0 20px; margin-left: 10px; border-radius: 5px; cursor: pointer; font-size: 16px; }
+        .message.assistant .content { background-color: var(--bg-white); color: var(--text-dark); }
+        .message.assistant .content::before {
+            content: ''; position: absolute; top: 12px; left: -8px;
+            border-top: 8px solid transparent;
+            border-bottom: 8px solid transparent;
+            border-right: 10px solid var(--bg-white);
+        }
+
+        .input-area { display: flex; padding: 15px; border-top: 1px solid var(--border-color); background-color: var(--bg-white); }
+        textarea { flex-grow: 1; border: 1px solid var(--border-color); border-radius: 8px; padding: 10px; font-size: 16px; resize: none; transition: border-color 0.3s, box-shadow 0.3s; line-height: 1.5; }
+        textarea:focus { border-color: var(--primary-color); box-shadow: 0 0 0 3px var(--primary-light); outline: none; }
+        
+        button { background-color: var(--primary-color); color: var(--text-light); border: none; padding: 10px 20px; margin-left: 10px; border-radius: 8px; cursor: pointer; font-size: 16px; font-weight: 700; transition: background-color 0.3s, transform 0.1s; }
+        button:hover:not(:disabled) { background-color: #36a873; }
+        button:active:not(:disabled) { transform: scale(0.98); }
         button:disabled { background-color: #a5d6b8; cursor: not-allowed; }
         .loading-indicator { text-align: center; color: #888; }
     </style>
@@ -44,54 +82,51 @@
         <button @click="resetDebate" class="reset-button">リセット</button>
     </div>
 
-    <!-- ディベート設定画面 -->
-    <div v-if="!debateStarted" class="setup-area">
-        <div class="form-group">
-            <button @click="validateTopic" :disabled="!debateTopic.trim() || isTopicValidating">テーマを検証</button>
-            <label for="topic">ディベートのテーマ</label>
-            <input type="text" id="topic" v-model="debateTopic" placeholder="例：AIは人間の仕事を奪うか？">
-        </div>
-        <div class="form-group">
-            <label>あなたの立場</label>
-            <div class="position-options">
-                <label><input type="radio" v-model="userPosition" value="affirmative"> 肯定</label>
-                <label><input type="radio" v-model="userPosition" value="negative"> 否定</label>
-            </div>
-        </div>
-        <div class="form-group">
-            <label>どちらが先に発言しますか？</label>
-            <div class="position-options">
-                <label><input type="radio" v-model="firstSpeaker" value="user"> 自分から</label>
-                <label><input type="radio" v-model="firstSpeaker" value="ai"> AIから</label>
-            </div>
-            <p v-if="firstSpeaker === 'ai'" class="description">AIが最初の意見を述べます。</p>
-        </div>
-        <button @click="startDebate" :disabled="!debateTopic.trim() || !userPosition || !firstSpeaker || isLoading || !isTopicAppropriate">
-            {{ isLoading ? '設定中...' : 'ディベート開始' }}
-        </button>
-        <div v-if="validationMessage" style="color: green; text-align: center;">{{ validationMessage }}</div>
-        <div v-if="error" style="color: red; text-align: center;">{{ error }}</div>
+    <div v-if="!debateTheme" class="setup-card">
+        <h3>ディベートのテーマを入力してください</h3>
+        <form @submit.prevent="startDebate">
+            <input v-model="themeInput" placeholder="例：AIは人間の仕事を奪うか" />
+            <button type="submit" :disabled="!themeInput.trim()">開始</button>
+        </form>
     </div>
 
-    <!-- チャット画面 -->
-    <template v-if="debateStarted">
-        <div style="padding: 5px 20px; background-color: #f0f0f0; text-align: center; font-size: 14px;">テーマ: 「{{ debateTopic }}」 / あなた: {{ userPosition === 'affirmative' ? '肯定' : '否定' }} / AI: {{ aiPositionJp }}</div>
-        <div class="chat-window" ref="chatWindow">
-            <div v-for="(msg, index) in conversationHistory" :key="index" :class="['message', msg.role]">
+    <div v-if="debateTheme && !userStance" class="setup-card">
+        <h3>あなたの立場を選択してください</h3>
+        <p>テーマ: 「{{ debateTheme }}」</p>
+        <div class="button-group">
+            <button @click="selectStance('pro')">肯定派</button>
+            <button @click="selectStance('con')">否定派</button>
+        </div>
+    </div>
+
+    <div v-if="debateTheme && userStance && !isStarted" class="setup-card">
+        <h3>どちらが先に発言しますか？</h3>
+        <div class="button-group">
+            <button @click="setTurn(true)">先攻 (自分から)</button>
+            <button @click="setTurn(false)">後攻 (AIから)</button>
+        </div>
+    </div>
+
+    <div v-if="isStarted" class="chat-window" ref="chatWindow">
+        <div v-for="(msg, index) in conversationHistory" :key="index" :class="['message', msg.role]">
+            <div v-if="msg.role !== 'system'" class="message-body">
+                <img :src="msg.role === 'assistant' ? '/static/AI.png' : '/static/human.png'" class="icon">
                 <div class="content">
                     {{ msg.content }}
                 </div>
             </div>
-            <div v-if="isLoading" class="loading-indicator">
-                AIが考えています...
-            </div>
         </div>
-
+        <div v-if="isLoading" class="loading-indicator">
+            AIが考えています...
+        </div>
+    </div>
+    
+    <div v-if="isStarted">
         <form @submit.prevent="sendMessage" class="input-area">
             <textarea v-model="userInput" placeholder="AIへの意見を入力してください..." @keydown.enter.prevent="sendMessage" :disabled="isLoading"></textarea>
             <button type="submit" :disabled="isLoading || !userInput.trim()">送信</button>
         </form>
-    </template>
+    </div>
 </div>
 
 <script>
@@ -99,141 +134,135 @@ new Vue({
     el: '#app',
     data: {
         userInput: '',
+        themeInput: '',
+        debateTheme: '',
+        userStance: null, // 'pro' (肯定派) or 'con' (否定派)
+        isStarted: false,
+        initialMessage: '',
         conversationHistory: [],
-        isLoading: false,
-        debateStarted: false,
-        debateTopic: '',
-        userPosition: '', // 'affirmative' or 'negative'
-        firstSpeaker: 'user', // 'user' or 'ai'
-        isTopicAppropriate: false,
-        validationMessage: '',
-        aiPositionJp: '',
-        isTopicValidating: false,
-        error: ''
+        isLoading: false
     },
     methods: {
         resetDebate() {
-            if (confirm("ディベートをリセットして、テーマ設定画面に戻りますか？")) {
+            if (confirm("会話履歴を本当にリセットしますか？")) {
+                this.userInput = '';
+                this.themeInput = '';
+                this.debateTheme = '';
+                this.userStance = null;
+                this.isStarted = false;
+                this.initialMessage = '';
                 this.conversationHistory = [];
                 this.isLoading = false;
-                this.debateStarted = false;
-                this.debateTopic = '';
-                this.userPosition = '';
-                this.firstSpeaker = 'user';
-                this.isTopicAppropriate = false;
-                this.validationMessage = '';
-                this.aiPositionJp = '';
-                this.error = '';
             }
         },
-        async startDebate() {
-            if (!this.debateTopic.trim() || !this.userPosition || this.isLoading) return;
+        startDebate() {
+            if (!this.themeInput.trim()) return;
+            this.debateTheme = this.themeInput;
+            this.themeInput = ''; // 入力欄をクリア
+        },
+        selectStance(stance) {
+            this.userStance = stance;
+            const aiStance = (stance === 'pro') ? '否定派' : '肯定派';
+            const userStanceText = (stance === 'pro') ? '肯定派' : '否定派';
+
+            // ★変更点：システムプロンプトを更新し、後攻の場合の指示を追加
+            const systemPrompt = `あなたは、ディベートAIです。テーマは「${this.debateTheme}」です。あなたは「${aiStance}」の立場で議論します。ユーザーの意見に即座に反論してください。いかなる場合でも、挨拶、相槌、前置き（「しかし、」「一方で、」など）を一切含めず、文章の最初から反論の核心部分だけを記述してください。あなたの役割は、ユーザーの主張に対する直接的な反論のみです。反論は250文字程度にまとめてください。もしユーザーが後攻を選び、あなたが最初の発言者になった場合は、テーマに対してあなたの立場から最初の意見を述べてください。`;
+            this.conversationHistory.push({ role: 'system', content: systemPrompt });
+
+            this.initialMessage = `テーマ「${this.debateTheme}」について、ディベートを開始します。あなたは「${userStanceText}」です。`;
+        },
+        setTurn(isUserFirst) {
+            this.isStarted = true;
+            this.$nextTick(() => { // DOMが更新されるのを待つ
+                if (isUserFirst) {
+                    // ユーザーが先攻の場合
+                    this.conversationHistory.push({ role: 'assistant', content: `${this.initialMessage} あなたの意見をどうぞ。` });
+                } else {
+                    // AIが先攻の場合
+                    this.conversationHistory.push({ role: 'assistant', content: `${this.initialMessage} AIが最初の意見を述べます。` });
+                    this.fetchAiFirstTurn();
+                }
+            });
+        },
+        async sendMessage() {
+            // isAiFirstTurn 引数を削除
+            if (!this.userInput.trim() || this.isLoading) {
+                return;
+            }
             this.isLoading = true;
-            this.error = '';
 
-            try {
-                const response = await fetch('/start_debate', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        topic: this.debateTopic,
-                        user_position: this.userPosition
-                    })
-                });
-
-                if (!response.ok) {
-                    const errorData = await response.json();
-                    throw new Error(errorData.error || 'ディベートの開始に失敗しました。');
-                }
-
-                const result = await response.json();
-                this.aiPositionJp = result.ai_position_jp;
-                this.debateStarted = true;
-
-                if (this.firstSpeaker === 'ai') {
-                    await this.sendMessage(true); // AIから開始
-                }
-
-            } catch (error) {
-                console.error('Error starting debate:', error);
-                this.error = `エラー: ${error.message}`;
-            } finally {
-                this.isLoading = false;
-            }
-        },
-        async validateTopic() {
-            if (!this.debateTopic.trim() || this.isTopicValidating) return;
-
-            this.isTopicValidating = true;
-            this.error = '';
-
-            try {
-                const response = await fetch('/validate_topic', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ topic: this.debateTopic })
-                });
-
-                if (!response.ok) {
-                    const errorData = await response.json();
-                    throw new Error(errorData.error || 'テーマの検証に失敗しました。');
-                }
-
-                const result = await response.json();
-                this.isTopicAppropriate = result.is_appropriate;
-                this.validationMessage = `テーマの検証結果: ${result.validation_result}`;
-            } catch (error) {
-                this.error = `エラー: ${error.message}`;
-            } finally {
-                this.isTopicValidating = false;
-            }
-        },
-        async sendMessage(isFirstTurnByAi = false) {
+            // AIが先攻の場合のロジックを削除
             const userMessage = this.userInput;
-            if (!isFirstTurnByAi && (!userMessage.trim() || this.isLoading)) return;
-
-            this.isLoading = true;
-            this.error = '';
-
             this.conversationHistory.push({ role: 'user', content: userMessage });
             this.userInput = '';
-            this.$nextTick(() => this.scrollToBottom());
+            this.scrollToBottom();
+
             try {
                 const response = await fetch('/send_api', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        // AIの最初のターンの場合はtextは空、そうでなければユーザーの入力を送信
-                        text: userMessage,
-                        // AIの最初のターンでなければ、ユーザーの最後の発言を除いた履歴を送信
+                        messages: this.conversationHistory 
                     })
                 });
+
                 if (!response.ok) {
                     const errorData = await response.json();
                     throw new Error(errorData.error || 'サーバーでエラーが発生しました。');
                 }
+
                 const data = await response.json();
                 this.conversationHistory.push({ role: 'assistant', content: data.processed_text });
 
             } catch (error) {
                 console.error('Error:', error);
-                this.conversationHistory.push({ role: 'assistant', content: `エラー: ${error.message}` });
+                this.conversationHistory.push({ role: 'assistant', content: `エラーが発生しました: ${error.message}` });
             } finally {
                 this.isLoading = false;
-                this.$nextTick(() => this.scrollToBottom());
+                this.scrollToBottom();
+            }
+        },
+        async fetchAiFirstTurn() {
+            this.isLoading = true;
+            this.scrollToBottom();
+            // AIの最初のターンを促すために、現在の会話履歴（システムプロンプトと案内メッセージ）をAPIに送る
+            try {
+                const response = await fetch('/send_api', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        messages: this.conversationHistory
+                    })
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || 'サーバーでエラーが発生しました。');
+                }
+
+                const data = await response.json();
+                this.conversationHistory.push({ role: 'assistant', content: data.processed_text });
+
+            } catch (error) {
+                console.error('Error:', error);
+                this.conversationHistory.push({ role: 'assistant', content: `エラーが発生しました: ${error.message}` });
+            } finally {
+                this.isLoading = false;
+                this.scrollToBottom();
             }
         },
         scrollToBottom() {
             this.$nextTick(() => {
                 const chatWindow = this.$refs.chatWindow;
-                chatWindow.scrollTop = chatWindow.scrollHeight;
+                if (chatWindow) { // chatWindowが存在するか確認
+                    chatWindow.scrollTop = chatWindow.scrollHeight;
+                }
             });
         }
     }
+
 });
 </script>
 
 </body>
 </html>
-index.html
-12 KB

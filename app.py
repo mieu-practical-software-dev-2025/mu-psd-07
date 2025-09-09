@@ -1,5 +1,6 @@
 import os
 import json
+import re
 from flask import Flask, request, jsonify, send_from_directory
 from dotenv import load_dotenv
 from openai import OpenAI, APIError # Import the OpenAI library and specific errors
@@ -16,7 +17,7 @@ app = Flask(__name__)
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 SITE_URL = os.getenv("YOUR_SITE_URL", "http://localhost:5000")
 APP_NAME = os.getenv("YOUR_APP_NAME", "FlaskVueApp")
-DEFAULT_SYSTEM_PROMPT = "140字以内で回答してください。"
+DEFAULT_SYSTEM_PROMPT = "あなたは親切なアシスタントです。丁寧な言葉遣いで、140字以内で簡潔に回答してください。"
 DEFAULT_MODEL = "google/gemma-3-27b-it:free"
 
 # 開発モード時に静的ファイルのキャッシュを無効にする
@@ -133,14 +134,14 @@ def validate_theme():
         return jsonify({"error": "'theme' cannot be empty"}), 400
 
     # AIにテーマの妥当性を判断させるためのシステムプロンプト
-    validation_system_prompt = """あなたはディベートの審判です。ユーザーから提案されたテーマが、2者間でのディベートのテーマとして適切かどうかを判断してください。
+    validation_system_prompt = """あなたはディベートテーマを考えるのを手伝うアシスタントです。ユーザーから提案されたテーマが、2者間でのディベートに適しているか、以下の観点からアドバイスをしてください。
 判断基準は以下の通りです。
 1. 賛成と反対の明確な立場が存在するか？
 2. 倫理的に問題のあるテーマではないか？
 3. 非常に個人的な、または主観的すぎるテーマではないか？
 4. ある程度の議論の広がりが期待できるか？
 
-上記の基準に基づき、最終的な判断を「適切」または「不適切」のいずれかで示し、その理由を簡潔に説明してください。
+上記の基準に基づき、あなたの評価を「適切」または「不適切」のいずれかで示し、その理由を簡潔に説明してください。あくまで提案として、決めつけるような表現は避けてください。
 回答はJSON形式で、'judgement' (適切/不適切) と 'reason' (理由) の2つのキーを持つオブジェクトとしてください。
 例: {"judgement": "適切", "reason": "賛成と反対の立場が明確で、公共の関心事について多角的な議論が期待できるため。"}
 例: {"judgement": "不適切", "reason": "これは個人の好みの問題であり、客観的な議論には向いていません。"}
@@ -161,20 +162,19 @@ def validate_theme():
         ai_response = chat_completion.choices[0].message.content
         app.logger.info(f"AI validation response: {ai_response}")
 
-        # AIの応答がMarkdownのコードブロック（```json ... ```）で囲まれている場合を考慮して、
-        # 中身のJSON部分だけを抽出する
-        cleaned_response = ai_response.strip()
-        if cleaned_response.startswith("```json"):
-            cleaned_response = cleaned_response[7:] # "```json" を削除
-        if cleaned_response.endswith("```"):
-            cleaned_response = cleaned_response[:-3] # "```" を削除
+        # AIの応答からJSONオブジェクト/配列を抽出する
+        # AIが説明文などを付けてもJSON部分だけを取り出せるようにする
+        json_match = re.search(r'\{.*\}|\[.*\]', ai_response, re.DOTALL)
+        if not json_match:
+            app.logger.error(f"No JSON object found in AI response: {ai_response}")
+            return jsonify({"error": "AIの応答から有効なJSON形式のデータを見つけられませんでした。"}), 500
 
         try:
             # JSON文字列をPythonの辞書にパース
-            json_response = json.loads(cleaned_response.strip())
+            json_response = json.loads(json_match.group())
             return jsonify(json_response)
         except json.JSONDecodeError:
-            app.logger.error(f"Failed to parse AI response as JSON: {cleaned_response}")
+            app.logger.error(f"Failed to parse extracted JSON string: {json_match.group()}")
             return jsonify({"error": "AIからの応答をJSONとして解釈できませんでした。"}), 500
 
     except Exception as e:
@@ -195,15 +195,16 @@ def end_debate():
     conversation_history = data['messages']
     
     # フィードバックを生成するためのシステムプロンプト
-    feedback_system_prompt = """あなたは経験豊富なディベートの審査員です。
-これまでのディベートの会話履歴全体をレビューし、以下の観点からユーザーの議論を評価してください。
+    feedback_system_prompt = """あなたはディベートのコーチです。
+これまでのディベートの会話履歴全体を読み、参加者の健闘を称えつつ、今後の成長につながるような、優しく建設的なフィードバックをしてください。
+会話が短い場合でも、何か一つでも良い点を見つけて褒めてあげてください。
+もし可能であれば、以下の観点にも触れると、より良いフィードバックになります。
+*   **論理の一貫性**: 主張に一貫性があったか。
+*   **説得力**: 根拠は適切で、説得力があったか。
+*   **反論の質**: 相手の意見に対して、的確な反論ができていたか。
+*   **改善点**: 次にディベートを行う際の具体的なアドバイス。
 
-1.  **論理の一貫性**: 主張に一貫性があったか。
-2.  **説得力**: 根拠は適切で、説得力があったか。
-3.  **反論の質**: 相手の意見に対して、的確な反論ができていたか。
-4.  **改善点**: 次にディベートを行う際の具体的なアドバイス。
-
-上記の4つの項目について、**太字**の見出しを使って、それぞれ簡潔にフィードバックをまとめてください。
+上記の観点に触れる際は、**太字**の見出しを使い、ポジティブな視点で簡潔にフィードバックをまとめてください。
 """
 
     # 既存の会話履歴の先頭に、フィードバック用のシステムプロンプトを追加

@@ -193,11 +193,7 @@ def end_debate():
         return jsonify({"error": "Request must contain 'messages'"}), 400
 
     conversation_history = data['messages']
-    # 会話履歴が空の場合でも、エラーではなく評価不能のメッセージを返す
-    if not conversation_history:
-        app.logger.warning("end_debate called with empty conversation history.")
-        return jsonify({"feedback": "会話の履歴が短すぎるため、フィードバックを生成できませんでした。"})
-
+    
     # フィードバックを生成するためのシステムプロンプト
     feedback_system_prompt = """あなたは経験豊富なディベートの審査員です。
 これまでのディベートの会話履歴全体をレビューし、以下の観点からユーザーの議論を評価してください。
@@ -222,6 +218,11 @@ def end_debate():
 
         feedback_text = chat_completion.choices[0].message.content.strip()
         app.logger.info(f"AI feedback response: {feedback_text}")
+
+        # AIからの応答が空だった場合のフォールバック処理
+        if not feedback_text:
+            app.logger.warning("AI returned an empty feedback string.")
+            feedback_text = "AIから有効なフィードバックを取得できませんでした。会話のターンが少なすぎるか、内容がフィードバックに適していない可能性があります。"
 
         return jsonify({"feedback": feedback_text})
 

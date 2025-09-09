@@ -472,7 +472,7 @@ new Vue({
 
                 if (!response.ok) {
                     const errorData = await response.json();
-                    throw new Error(errorData.error || 'テーマのチェック中にエラーが発生しました。');
+                    throw new Error(errorData.error || `テーマのチェック中にエラーが発生しました (HTTP ${response.status})`);
                 }
 
                 this.validationResult = await response.json();

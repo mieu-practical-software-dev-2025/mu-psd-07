@@ -1,4 +1,5 @@
 import os
+import json
 from flask import Flask, request, jsonify, send_from_directory
 from dotenv import load_dotenv
 from openai import OpenAI, APIError # Import the OpenAI library and specific errors
@@ -167,11 +168,14 @@ def validate_theme():
             cleaned_response = cleaned_response[7:] # "```json" を削除
         if cleaned_response.endswith("```"):
             cleaned_response = cleaned_response[:-3] # "```" を削除
-        
-        # 整形されたJSON文字列をクライアントに返す
-        # Flaskは自動的に辞書をJSONに変換してくれるが、今回は文字列をそのまま返すため、
-        # ヘッダーを明示的に指定する
-        return cleaned_response.strip(), 200, {'Content-Type': 'application/json; charset=utf-8'}
+
+        try:
+            # JSON文字列をPythonの辞書にパース
+            json_response = json.loads(cleaned_response.strip())
+            return jsonify(json_response)
+        except json.JSONDecodeError:
+            app.logger.error(f"Failed to parse AI response as JSON: {cleaned_response}")
+            return jsonify({"error": "AIからの応答をJSONとして解釈できませんでした。"}), 500
 
     except Exception as e:
         app.logger.error(f"Error during theme validation: {e}")

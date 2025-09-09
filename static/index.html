@@ -336,7 +336,7 @@
     <div class="header">
         <h2>AIディベート</h2>
         <div class="button-group">
-            <button v-if="debateStarted && !isDebateFinished" @click="endDebate" :disabled="isLoading" class="reset-button end-debate-header-button">ディベート終了</button>
+            <button v-if="canEndDebate" @click="endDebate" :disabled="isLoading" class="reset-button end-debate-header-button">ディベート終了</button>
             <button @click="resetDebate" class="reset-button">リセット</button>
         </div>
     </div>
@@ -428,6 +428,11 @@ new Vue({
         isThemeValid() {
             // テーマが「適切」と判断された場合にtrueを返す
             return this.validationResult.judgement === '適切';
+        },
+        canEndDebate() {
+            // ディベートが開始され、終了しておらず、ユーザーの発言が1回以上ある場合にtrue
+            const hasUserMessage = this.conversationHistory.some(msg => msg.role === 'user');
+            return this.debateStarted && !this.isDebateFinished && hasUserMessage;
         }
     },
     methods: {

@@ -599,14 +599,16 @@ new Vue({
 
                 if (!response.ok) {
                     const errorData = await response.json();
-                    throw new Error(errorData.error || 'フィードバックの取得中にエラーが発生しました。');
+                    const errorMessage = errorData.error || 'フィードバックの取得中にエラーが発生しました。';
+                    throw new Error(errorMessage);
                 }
 
                 const data = await response.json();
                 this.conversationHistory.push({ role: 'assistant', content: `--- ディベート終了 ---\n\nお疲れ様でした。今回のディベートのフィードバックです。\n\n${data.feedback}` });
             } catch (error) {
                 console.error('Error:', error);
-                this.conversationHistory.push({ role: 'assistant', content: `エラーが発生しました: ${error.message}` });
+                // エラーメッセージをチャット画面に表示
+                this.conversationHistory.push({ role: 'assistant', content: `フィードバックの取得中にエラーが発生しました: ${error.message}` });
             } finally {
                 this.isLoading = false;
                 this.scrollToBottom();

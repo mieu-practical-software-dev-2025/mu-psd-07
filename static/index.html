@@ -60,6 +60,11 @@
             align-items: center; 
             flex-shrink: 0;
         }
+        .header .button-group {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
         .header h2 { 
             margin: 0; 
             font-weight: 700;
@@ -75,6 +80,11 @@
             font-size: 14px; 
             font-weight: 500;
             transition: all 0.3s ease; 
+        }
+        .end-debate-header-button {
+            background-color: var(--accent-color);
+            color: var(--text-light);
+            border-color: var(--accent-color);
         }
         .reset-button:hover { 
             background-color: var(--accent-light);
@@ -256,6 +266,12 @@
             cursor: not-allowed; 
             box-shadow: none;
         }
+        .end-debate-button {
+            background: var(--accent-color);
+        }
+        .end-debate-button:hover:not(:disabled) {
+            background: #C53030; /* Red-700 */
+        }
         
         /* Validation Result Area */
         .validation-result {
@@ -319,7 +335,10 @@
 <div id="app">
     <div class="header">
         <h2>AIディベート</h2>
-        <button @click="resetDebate" class="reset-button">リセット</button>
+        <div class="button-group">
+            <button v-if="debateStarted && !isDebateFinished" @click="endDebate" :disabled="isLoading" class="reset-button end-debate-header-button">ディベート終了</button>
+            <button @click="resetDebate" class="reset-button">リセット</button>
+        </div>
     </div>
 
     <!-- 設定画面 -->
@@ -381,7 +400,7 @@
             AIが考えています...
         </div>
         </div>
-        <form @submit.prevent="sendMessage" class="input-area">
+        <form @submit.prevent="sendMessage" class="input-area" v-if="!isDebateFinished">
             <textarea v-model="userInput" placeholder="AIへの意見を入力してください..." @keydown.enter.prevent="sendMessage" :disabled="isLoading"></textarea>
             <button type="submit" :disabled="isLoading || !userInput.trim()">送信</button>
         </form>
@@ -402,7 +421,8 @@ new Vue({
         firstSpeaker: '', // 'user' or 'ai'
         aiPositionJp: '',
         error: '',
-        validationResult: { judgement: null, reason: null } // テーマの妥当性チェック結果
+        validationResult: { judgement: null, reason: null }, // テーマの妥当性チェック結果
+        isDebateFinished: false // ディベートが終了したかどうか
     },
     computed: {
         isThemeValid() {
@@ -423,6 +443,7 @@ new Vue({
                 this.aiPositionJp = '';
                 this.error = '';
                 this.validationResult = { judgement: null, reason: null };
+                this.isDebateFinished = false;
             }
         },
         formatMessage(content) {
@@ -545,6 +566,39 @@ new Vue({
                 const data = await response.json();
                 this.conversationHistory.push({ role: 'assistant', content: data.processed_text });
 
+            } catch (error) {
+                console.error('Error:', error);
+                this.conversationHistory.push({ role: 'assistant', content: `エラーが発生しました: ${error.message}` });
+            } finally {
+                this.isLoading = false;
+                this.scrollToBottom();
+            }
+        },
+        async endDebate() {
+            if (this.isLoading) return;
+            if (!confirm("ディベートを終了し、AIからフィードバックを受け取りますか？")) return;
+
+            this.isLoading = true;
+            this.isDebateFinished = true; // 入力フォームを非表示にする
+            this.scrollToBottom();
+
+            try {
+                // システムプロンプトを除いた会話履歴を送信
+                const historyForFeedback = this.conversationHistory.filter(msg => msg.role !== 'system');
+
+                const response = await fetch('/end_debate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ messages: historyForFeedback })
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || 'フィードバックの取得中にエラーが発生しました。');
+                }
+
+                const data = await response.json();
+                this.conversationHistory.push({ role: 'assistant', content: `--- ディベート終了 ---\n\nお疲れ様でした。今回のディベートのフィードバックです。\n\n${data.feedback}` });
             } catch (error) {
                 console.error('Error:', error);
                 this.conversationHistory.push({ role: 'assistant', content: `エラーが発生しました: ${error.message}` });

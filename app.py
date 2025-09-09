@@ -181,6 +181,50 @@ def validate_theme():
         app.logger.error(f"Error during theme validation: {e}")
         return jsonify({"error": "テーマの妥当性チェック中にAIサービスでエラーが発生しました。"}), 500
 
+@app.route('/end_debate', methods=['POST'])
+def end_debate():
+    """ディベート全体の内容についてAIにフィードバックを生成させるエンドポイント"""
+    if not client:
+        app.logger.error("OpenRouter API key not configured.")
+        return jsonify({"error": "OpenRouter API key is not configured on the server."}), 500
+
+    data = request.get_json()
+    if not data or 'messages' not in data:
+        return jsonify({"error": "Request must contain 'messages'"}), 400
+
+    conversation_history = data['messages']
+
+    # フィードバックを生成するためのシステムプロンプト
+    feedback_system_prompt = """あなたは経験豊富なディベートの審査員です。
+これまでのディベートの会話履歴全体をレビューし、以下の観点からユーザーの議論を評価してください。
+
+1.  **論理の一貫性**: 主張に一貫性があったか。
+2.  **説得力**: 根拠は適切で、説得力があったか。
+3.  **反論の質**: 相手の意見に対して、的確な反論ができていたか。
+4.  **改善点**: 次にディベートを行う際の具体的なアドバイス。
+
+上記の4つの項目について、**太字**の見出しを使って、それぞれ簡潔にフィードバックをまとめてください。
+"""
+
+    # 既存の会話履歴の先頭に、フィードバック用のシステムプロンプトを追加
+    messages_for_feedback = [{"role": "system", "content": feedback_system_prompt}] + conversation_history
+
+    try:
+        app.logger.info(f"Generating debate feedback for a conversation with {len(conversation_history)} messages.")
+        chat_completion = client.chat.completions.create(
+            model=DEFAULT_MODEL,
+            messages=messages_for_feedback,
+        )
+
+        feedback_text = chat_completion.choices[0].message.content.strip()
+        app.logger.info(f"AI feedback response: {feedback_text}")
+
+        return jsonify({"feedback": feedback_text})
+
+    except Exception as e:
+        app.logger.error(f"Error during debate feedback generation: {e}")
+        return jsonify({"error": "フィードバックの生成中にAIサービスでエラーが発生しました。"}), 500
+
 # スクリプトが直接実行された場合にのみ開発サーバーを起動
 if __name__ == '__main__':
     # 起動時の警告はクライアント初期化時にapp.loggerで行うように変更

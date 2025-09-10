@@ -195,16 +195,17 @@ def end_debate():
     conversation_history = data['messages']
     user_message_count = sum(1 for msg in conversation_history if msg.get('role') == 'user')
 
+    # 会話の長さに応じてプロンプトを切り替える
     
-    feedback_system_prompt = """
-最初のuserに対するテーマと立場の説明は読まなくていいです。
-それ以降のディベートの会話履歴を読み、フィードバックをしてください。
-具体的には以下の観点について100点満点で評価してください。
-論理の一貫性: 主張に一貫性があったか。
-説得力: 根拠は適切で、説得力があったか。
-反論の質: 相手の意見に対して、的確な反論ができていたか。
+    feedback_system_prompt = """あなたはディベートのコーチです。
+これまでのディベートの会話履歴全体を読み、参加者の健闘を称えつつ、今後の成長につながるような、優しく建設的なフィードバックをしてください。
+以下の観点に触れると、より良いフィードバックになります。
+* **論理の一貫性**: 主張に一貫性があったか。
+* **説得力**: 根拠は適切で、説得力があったか。
+* **反論の質**: 相手の意見に対して、的確な反論ができていたか。
+* **改善点**: 次にディベートを行う際の具体的なアドバイス。
 
-そして最後に改善点を教えてあげてください。
+上記の観点に触れる際は、**太字**の見出しを使い、ポジティブな視点で簡潔にフィードバックをまとめてください。
 """
 
     # 既存の会話履歴の先頭に、フィードバック用のシステムプロンプトを追加
@@ -217,18 +218,14 @@ def end_debate():
             messages=messages_for_feedback,
         )
 
-        feedback_text = ""
-        # APIからのレスポンスが期待通りかチェックし、内容を取得
-        if chat_completion.choices and chat_completion.choices[0].message and chat_completion.choices[0].message.content:
-            feedback_text = chat_completion.choices[0].message.content.strip()
-
-        # AIからの応答が空だった場合に備えて、デフォルトのメッセージを設定
-        if not feedback_text:
-            app.logger.warning("AI returned empty feedback. Providing a default message.")
-            feedback_text = "AIからのフィードバックがありませんでした。会話が短すぎるか、内容を解釈できなかった可能性があります。"
-
+        feedback_text = chat_completion.choices[0].message.content.strip()
         app.logger.info(f"AI feedback response: {feedback_text}")
         app.logger.info(f"AI feedback response: {chat_completion}")
+
+        # AIからの応答が空だった場合のフォールバック処理
+        if not feedback_text:
+            app.logger.warning("AI returned an empty feedback string.")
+            feedback_text = "AIから有効なフィードバックを取得できませんでした。会話のターンが少なすぎるか、内容がフィードバックに適していない可能性があります。"
 
         return jsonify({"feedback": feedback_text})
 

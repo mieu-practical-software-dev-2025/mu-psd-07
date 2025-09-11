@@ -18,7 +18,7 @@ OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 SITE_URL = os.getenv("YOUR_SITE_URL", "http://localhost:5000")
 APP_NAME = os.getenv("YOUR_APP_NAME", "FlaskVueApp")
 DEFAULT_SYSTEM_PROMPT = "あなたは親切なアシスタントです。丁寧な言葉遣いで、140字以内で簡潔に回答してください。"
-DEFAULT_MODEL = "google/gemini-2.0-flash-exp:free"
+DEFAULT_MODEL = "google/gemma-3-27b-it:free"
 
 # 開発モード時に静的ファイルのキャッシュを無効にする
 if app.debug:
